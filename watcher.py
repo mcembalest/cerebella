@@ -10,6 +10,9 @@ import difflib
 CEREBELLA_IGNORE_DIRS = ['__pycache__', 'node_modules', '.git']
 FILETYPES_WITH_LINE_NUMBERS = ('.py', '.js', '.ts', '.txt', '.md', '.csv', '.json', '.xml', '.html', '.yaml')
 
+with open('dashboard.html', 'r') as f:
+    HTML = f.read()
+
 state = {
     'watching': None,
     'files': {},
@@ -107,7 +110,6 @@ def watch_files():
                                 
                                 state['changes'].insert(0, change)
                         else:
-                            # New file
                             change = {
                                 'file': os.path.relpath(filepath, state['watching']),
                                 'time': time.strftime('%H:%M:%S'),
@@ -127,102 +129,6 @@ def watch_files():
             except Exception as e:
                 pass
         time.sleep(0.5)
-
-HTML = '''
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Cerebella</title>
-    <style>
-        body { font-family: monospace; max-width: 800px; margin: 50px auto; padding: 20px; }
-        input { width: 400px; padding: 10px; font-size: 16px; }
-        button { padding: 10px 20px; font-size: 16px; margin: 5px; }
-        .status { margin: 20px 0; padding: 10px; background: #f0f0f0; }
-        .change { padding: 5px; margin: 2px 0; background: #fffacd; cursor: pointer; }
-        .change:hover { background: #fff8dc; }
-        .watching { color: green; font-weight: bold; }
-        .diff { 
-            display: none; 
-            background: #2d2d30; 
-            color: #d4d4d4; 
-            padding: 10px; 
-            margin: 5px 0; 
-            white-space: pre-wrap; 
-            font-size: 12px;
-            overflow-x: auto;
-        }
-        .diff-add { color: #4ec9b0; }
-        .diff-del { color: #f44747; }
-        .diff-hdr { color: #569cd6; }
-    </style>
-</head>
-<body>
-    <h1>Cerebella</h1>
-    <form method="POST" action="/watch">
-        <input type="text" name="directory" placeholder="/path/to/watch" value="">
-        <button type="submit">Start Watching</button>
-    </form>
-    <button onclick="fetch('/clear', {method: 'POST'}).then(() => update())">Clear</button>
-    <div class="status">
-        <div id="watching">Not watching anything</div>
-        <div id="stats"></div>
-    </div>
-    <h2>Changes</h2>
-    <div id="changes"></div>
-    <script>
-        function formatDiff(diff) {
-            if (!diff) return '';
-            return diff.split('\\n').map(line => {
-                if (line.startsWith('+') && !line.startsWith('+++'))
-                    return '<span class="diff-add">' + line + '</span>';
-                if (line.startsWith('-') && !line.startsWith('---'))
-                    return '<span class="diff-del">' + line + '</span>';
-                if (line.startsWith('@@') || line.startsWith('+++') || line.startsWith('---'))
-                    return '<span class="diff-hdr">' + line + '</span>';
-                return line;
-            }).join('\\n');
-        }
-        
-        function toggleDiff(index) {
-            const diff = document.getElementById('diff-' + index);
-            diff.style.display = diff.style.display === 'none' ? 'block' : 'none';
-        }
-        
-        function update() {
-            fetch('/state')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.watching) {
-                        document.getElementById('watching').innerHTML = 
-                            '<span class="watching">Watching:</span> ' + data.watching;
-                        document.getElementById('stats').textContent = 
-                            Object.keys(data.files).length + ' files tracked, ' + 
-                            data.changes.length + ' changes';
-                    }                    
-                    const changesDiv = document.getElementById('changes');
-                    changesDiv.innerHTML = data.changes.map((c, i) => {
-                        let html = '<div>';
-                        html += '<div class="change" onclick="toggleDiff(' + i + ')">';
-                        html += c.time + ' - ' + c.file + c.ext;
-                        html += ' (' + (c.size_change > 0 ? '+' : '') + c.size_change + ' bytes';
-                        if (c.lines_change !== null) {
-                            html += ', ' + (c.lines_change > 0 ? '+' : '') + c.lines_change + ' lines';
-                        }
-                        html += ')</div>';
-                        if (c.diff) {
-                            html += '<div class="diff" id="diff-' + i + '">' + formatDiff(c.diff) + '</div>';
-                        }
-                        html += '</div>';
-                        return html;
-                    }).join('');
-                });
-        }
-        setInterval(update, 1000);
-        update();
-    </script>
-</body>
-</html>
-'''
 
 if __name__ == '__main__':
     watcher = threading.Thread(target=watch_files, daemon=True)
