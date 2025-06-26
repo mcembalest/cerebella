@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cerebella</title>
+    <style>
+        body { font-family: monospace; max-width: 800px; margin: 50px auto; padding: 20px; }
+        input { width: 400px; padding: 10px; font-size: 16px; }
+        button { padding: 10px 20px; font-size: 16px; }
+        .status { margin: 20px 0; padding: 10px; background: #f0f0f0; }
+        .change { padding: 5px; margin: 2px 0; background: #fffacd; }
+        .watching { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Cerebella</h1>
+    <form method="POST" action="/watch">
+        <input type="text" name="directory" placeholder="/path/to/watch" value="">
+        <button type="submit">Start Watching</button>
+    </form>
+    <button onclick="fetch('/clear', {method: 'POST'}).then(() => update())">Clear</button>
+    <div class="status">
+        <div id="watching">Not watching anything</div>
+        <div id="stats"></div>
+    </div>
+    <h2>Changes</h2>
+    <div id="changes"></div>
+    <script>
+        function update() {
+            fetch('/state')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.watching) {
+                        document.getElementById('watching').innerHTML = 
+                            '<span class="watching">Watching:</span> ' + data.watching;
+                        document.getElementById('stats').textContent = 
+                            Object.keys(data.files).length + ' files tracked, ' + 
+                            data.changes.length + ' changes';
+                    }                    
+                    const changesDiv = document.getElementById('changes');
+                    changesDiv.innerHTML = data.changes.map(c => 
+                        '<div class="change">' + c.time + ' - ' + c.file + 
+                        ' (' + (c.size_change > 0 ? '+' : '') + c.size_change + ' bytes)</div>'
+                    ).join('');
+                });
+        }
+        setInterval(update, 1000);
+        update();
+    </script>
+</body>
+</html>
