@@ -37,21 +37,29 @@ function update() {
                 if (data.watching) {
                     document.getElementById('watching').innerHTML = 
                         '<span class="watching">Watching:</span> ' + escapeHtml(data.watching);
-                    document.getElementById('stats').textContent = 
-                        Object.keys(data.files).length + ' files tracked, ' + 
-                        data.changes.length + ' changes';
+                    
+                    let statsText = Object.keys(data.files).length + ' files tracked, ' + 
+                                   data.changes.length + ' changes';
+                    
+                    // Add state vector preview if available
+                    if (data.state_vector && data.state_vector.length > 0) {
+                        if (data.state_vector.length <= 10) {
+                            // If vector is short, show all elements
+                            const vectorStr = data.state_vector.map(v => Number(v).toFixed(2)).join(', ');
+                            statsText += `<div class="vector-info">State vector: [${vectorStr}]</div>`;
+                        } else {
+                            // Show first 5 and last 5 elements
+                            const vectorHead = data.state_vector.slice(0, 5).map(v => Number(v).toFixed(2)).join(', ');
+                            const vectorTail = data.state_vector.slice(-5).map(v => Number(v).toFixed(2)).join(', ');
+                            statsText += `<div class="vector-info">State vector: [${vectorHead} ... ${vectorTail}]</div>`;
+                        }
+                    }
+                    
+                    document.getElementById('stats').innerHTML = statsText;
                 }
                 
                 const changesDiv = document.getElementById('changes');
                 changesDiv.innerHTML = data.changes.map((c, i) => {
-                    // Format vector for display
-                    let vectorDisplay = '';
-                    if (c.vector_head && c.vector_tail) {
-                        const headStr = c.vector_head.map(v => Number(v).toFixed(2)).join(', ');
-                        const tailStr = c.vector_tail.map(v => Number(v).toFixed(2)).join(', ');
-                        vectorDisplay = `<div class="vector-info">[${headStr} ... ${tailStr}]</div>`;
-                    }
-                    
                     let html = '<div>';
                     html += '<div class="change" onclick="toggleDiff(' + i + ')">';
                     html += '<div class="change-info">';
@@ -61,7 +69,6 @@ function update() {
                         html += ', ' + (c.lines_change > 0 ? '+' : '') + c.lines_change + ' lines';
                     }
                     html += ')</div>';
-                    html += vectorDisplay;
                     html += '</div>';
                     if (c.diff) {
                         const isOpen = openDiffs.has(i);
