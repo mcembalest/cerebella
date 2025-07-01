@@ -1,6 +1,6 @@
 [project]
 name = "cerebella"
-version = "0.1.0"
+version = "0.1.2"
 description = "this is what vibe coding should feel like"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -10,3 +10,6 @@ dependencies = [
     "huggingface-hub>=0.33.1",
     "numpy>=2.3.1",
 ]
+
+[project.scripts]
+cerebella = "main:main"

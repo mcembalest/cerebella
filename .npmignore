@@ -1,0 +1,37 @@
+# Development files
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build files
+target/
+Cargo.lock
+Cargo.toml
+src/
+
+# Test files
+test/
+tests/
+
+# Documentation source
+docs/
+
+# Misc
+.DS_Store
+*.log
+uv.lock

@@ -1,23 +1,38 @@
 {
   "name": "cerebella",
-  "version": "0.1.0",
-  "description": "this is what vibe coding should feel like",
+  "version": "0.1.2",
+  "description": "this is how coding with AI should feel",
   "type": "module",
   "main": "cli.js",
   "bin": {
     "cerebella": "./cli.js"
   },
   "scripts": {
-    "start": "node cli.js"
+    "start": "node cli.js",
+    "prepublishOnly": "echo 'Ready to publish!'"
   },
-  "keywords": ["cerebella", "vibe", "coding"],
-  "author": "",
+  "keywords": ["vibe", "coding", "development", "cli", "llm", "agent", "working memory"],
+  "author": "Max Cembalest <macembalest@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mcembalest/cerebella.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mcembalest/cerebella/issues"
+  },
+  "homepage": "https://github.com/mcembalest/cerebella#readme",
   "dependencies": {
     "chalk": "^5.3.0",
     "ora": "^7.0.1"
   },
   "engines": {
     "node": ">=16.0.0"
-  }
+  },
+  "files": [
+    "cli.js",
+    "*.py",
+    "dashboard/",
+    "README.md"
+  ]
 }
