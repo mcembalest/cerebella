@@ -1,6 +1,6 @@
 {
   "name": "cerebella",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "this is how coding with AI should feel",
   "type": "module",
   "main": "cli.js",
