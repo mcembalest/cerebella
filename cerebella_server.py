@@ -128,15 +128,18 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
         self.html_content = load_dashboard_html()
         super().__init__(*args, **kwargs)
     
-    def serve_static_file(self, filepath):
+    def serve_static_file(self, filepath, content_type=None):
         """Serve a static file with appropriate content type."""
-        content_types = {
-            '.css': 'text/css',
-            '.js': 'application/javascript',
-            '.html': 'text/html'
-        }
-        ext = Path(filepath).suffix
-        content_type = content_types.get(ext, 'application/octet-stream')
+        if content_type is None:
+            content_types = {
+                '.css': 'text/css',
+                '.js': 'application/javascript',
+                '.html': 'text/html',
+                '.png': 'image/png',
+                '.ico': 'image/x-icon'
+            }
+            ext = Path(filepath).suffix
+            content_type = content_types.get(ext, 'application/octet-stream')
         
         try:
             with open(filepath, 'rb') as f:
@@ -159,6 +162,8 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(CEREBELLA_STATE.serialize()).encode())
+        elif self.path == '/favicon.ico':
+            self.serve_static_file('assets/cerebella_temp_icon.png', 'image/png')
         elif self.path in ['/dashboard.css', '/dashboard.js']:
             self.serve_static_file(f'dashboard{self.path}')
         else:
