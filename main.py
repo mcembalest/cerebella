@@ -9,15 +9,7 @@ def main():
     # Check if embeddings are enabled
     enable_embeddings = '--embeddings' in sys.argv
     
-    print("""
-╭───╮╭───╮╭───╮╭───╮╭───╮╭───╮╭╮   ╭╮   ╭───╮
-│╭─╮││╭──╯│╭─╮││╭──╯│╭─╮││╭──╯││   ││   │╭─╮│
-││ ╰╯│╰──╮│╰─╯││╰──╮│╰─╯││╰──╮││   ││   │╰─╯│
-││ ╭╮│╭──╯│╭╮╭╯│╭──╯│╭─╮││╭──╯││   ││   │╭─╮│
-│╰─╯││╰──╮│││╰╮│╰──╮│╰─╯││╰──╮│╰──╮│╰──╮││ ││
-╰───╯╰───╯╰╯╰─╯╰───╯╰───╯╰───╯╰───╯╰───╯╰╯ ╰╯
-""")
-    print(f"Open http://localhost:{CEREBELLA_SERVER_PORT} in your browser")
+    print(f"Server starting on http://localhost:{CEREBELLA_SERVER_PORT}")
 
     watch_thread = threading.Thread(target=watch_files_loop, daemon=True)
     watch_thread.start()

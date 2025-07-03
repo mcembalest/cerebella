@@ -14,6 +14,57 @@ const __dirname = dirname(__filename);
 const MAIN_SERVER_PORT = 8421;
 const EMBEDDINGS_PORT = 8080;
 
+const CEREBELLA_LOGO = [
+  '      ........  .......... .........  .......... .........  .......... ...        ...            ...  ',
+  '    .+.    .+. .+.        .+.    .+. .+.        .+.    .+. .+.        .+.        .+.          .+. .+. ',
+  '   +.+        +.+        +.+    +.+ +.+        +.+    +.+ +.+        +.+        +.+         +.+   +.+ ',
+  '  +*+        +*++.++*   +*++.++*.  +*++.++*   +*++.++*+  +*++.++*   +*+        +*+        +*++.++*++. ',
+  ' +*+        +*+        +*+    +*+ +*+        +*+    +*+ +*+        +*+        +*+        +*+     +*+ ',
+  '*+*   *+*  *+*        *+*    *+* *+*        *+*    *+* *+*        *+*        *+*        *+*     *+* ',
+  '#######   ########## ###    ### ########## #########  ########## ########## ########## ###     ###  ',
+];
+
+async function animateLogo() {
+  console.clear();
+  console.log('\n');
+  
+  // Create empty lines for the logo
+  const logoLines = new Array(CEREBELLA_LOGO.length).fill('');
+  
+  // Animation duration: 4 seconds
+  const totalDuration = 4000;
+  const totalChars = CEREBELLA_LOGO.join('').length;
+  const charDelay = totalDuration / totalChars;
+  
+  let charIndex = 0;
+  
+  for (let lineIndex = 0; lineIndex < CEREBELLA_LOGO.length; lineIndex++) {
+    for (let charPos = 0; charPos < CEREBELLA_LOGO[lineIndex].length; charPos++) {
+      logoLines[lineIndex] += CEREBELLA_LOGO[lineIndex][charPos];
+      
+      // Clear and redraw
+      process.stdout.write('\x1b[H'); // Move cursor to top
+      console.log('\n');
+      logoLines.forEach(line => {
+        console.log(chalk.cyan(line));
+      });
+      
+      // Add some spacing
+      for (let i = logoLines.length; i < CEREBELLA_LOGO.length; i++) {
+        console.log('');
+      }
+      
+      charIndex++;
+      
+      // Wait before next character
+      await new Promise(resolve => setTimeout(resolve, charDelay));
+    }
+  }
+  
+  // Add a small pause at the end
+  await new Promise(resolve => setTimeout(resolve, 300));
+}
+
 const args = process.argv.slice(2);
 const showHelp = args.includes('--help') || args.includes('-h');
 const enableEmbeddings = args.includes('--embeddings') || args.includes('-e');
@@ -66,7 +117,7 @@ if (shouldStartEmbeddings) {
       if (!embeddingsReady) {
         embeddingsReady = true;
         embeddingsSpinner.succeed(chalk.green('Embeddings server ready'));
-        displayRunningMessage(true);
+        displayRunningMessage(true).catch(console.error);
       }
     }
     if (process.env.DEBUG) {
@@ -103,10 +154,13 @@ if (shouldStartEmbeddings) {
     }
   });
 } else {
-  setTimeout(() => displayRunningMessage(false), 100);
+  setTimeout(() => displayRunningMessage(false).catch(console.error), 100);
 }
 
-function displayRunningMessage(withEmbeddings) {
+async function displayRunningMessage(withEmbeddings) {
+  // Show the animated logo first
+  await animateLogo();
+  
   console.log(chalk.cyan('\nCerebella is running!\n'));
   console.log(chalk.gray(`  Main server: http://localhost:${MAIN_SERVER_PORT}`));
   if (withEmbeddings) {
@@ -116,7 +170,7 @@ function displayRunningMessage(withEmbeddings) {
   }
   console.log(chalk.yellow('\nPress Ctrl+C to stop\n'));
   
-  // Automatically open the browser
+  // Automatically open the browser after animation
   const url = `http://localhost:${MAIN_SERVER_PORT}`;
   open(url).catch(err => {
     console.log(chalk.gray(`Could not auto-open browser: ${err.message}`));
