@@ -24,7 +24,8 @@
   "homepage": "https://github.com/mcembalest/cerebella#readme",
   "dependencies": {
     "chalk": "^5.3.0",
-    "ora": "^7.0.1"
+    "ora": "^7.0.1",
+    "open": "^10.0.0"
   },
   "engines": {
     "node": ">=16.0.0"

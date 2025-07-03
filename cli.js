@@ -3,6 +3,7 @@
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import ora from 'ora';
+import open from 'open';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import process from 'process';
@@ -114,6 +115,13 @@ function displayRunningMessage(withEmbeddings) {
     console.log(chalk.gray(`  Embeddings: ${chalk.yellow('disabled')}`));
   }
   console.log(chalk.yellow('\nPress Ctrl+C to stop\n'));
+  
+  // Automatically open the browser
+  const url = `http://localhost:${MAIN_SERVER_PORT}`;
+  open(url).catch(err => {
+    console.log(chalk.gray(`Could not auto-open browser: ${err.message}`));
+    console.log(chalk.gray(`Please manually open: ${url}`));
+  });
 }
 
 const cleanup = (signal) => {
