@@ -36,16 +36,16 @@ body::before {
 }
 
 h1 {
-    font-size: clamp(2.5rem, 8vw, 4rem);
+    font-size: clamp(3rem, 10vw, 6rem);
     font-weight: 200;
     letter-spacing: 0.01em;
-    margin-bottom: 2rem;
-    text-align: center;
+    margin-bottom: 1rem;
     background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 25%, #a5b4fc 50%, #818cf8 75%, #6366f1 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: glow 3s ease-in-out infinite;
+    position: relative;
+    will-change: transform, text-shadow; /* Performance optimization */
 }
 
 @keyframes glow {
