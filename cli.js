@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import chalk from 'chalk';
 import ora from 'ora';
 import open from 'open';
@@ -25,12 +25,8 @@ const CEREBELLA_LOGO = [
 
 async function animateLogo() {
   console.clear();
-  console.log('\n');
-  
-  // Create empty lines for the logo
+  console.log('\n');  
   const logoLines = new Array(CEREBELLA_LOGO.length).fill('');
-  
-  // Animation duration: 4 seconds
   const totalDuration = 4000;
   const totalChars = CEREBELLA_LOGO.join('').length;
   const charDelay = totalDuration / totalChars;
@@ -39,28 +35,23 @@ async function animateLogo() {
   
   for (let lineIndex = 0; lineIndex < CEREBELLA_LOGO.length; lineIndex++) {
     for (let charPos = 0; charPos < CEREBELLA_LOGO[lineIndex].length; charPos++) {
-      logoLines[lineIndex] += CEREBELLA_LOGO[lineIndex][charPos];
-      
-      // Clear and redraw
-      process.stdout.write('\x1b[H'); // Move cursor to top
+      logoLines[lineIndex] += CEREBELLA_LOGO[lineIndex][charPos];      
+      process.stdout.write('\x1b[H');
       console.log('\n');
       logoLines.forEach(line => {
         console.log(chalk.cyan(line));
       });
       
-      // Add some spacing
       for (let i = logoLines.length; i < CEREBELLA_LOGO.length; i++) {
         console.log('');
       }
       
       charIndex++;
       
-      // Wait before next character
       await new Promise(resolve => setTimeout(resolve, charDelay));
     }
   }
   
-  // Add a small pause at the end
   await new Promise(resolve => setTimeout(resolve, 300));
 }
 
@@ -86,6 +77,67 @@ ${chalk.gray('By default, Cerebella runs without the embeddings server.')}
 ${chalk.gray('To install text-embeddings-router: cargo install text-embeddings-router')}
 `);
   process.exit(0);
+}
+
+try {
+  execSync('uv --version', { stdio: 'ignore' });
+} catch (e) {
+  console.log(chalk.yellow('Installing uv package manager...'));
+  const installSpinner = ora('Installing uv...').start();
+  
+  try {
+    execSync('curl --version', { stdio: 'ignore' });
+  } catch (curlError) {
+    installSpinner.fail(chalk.red('curl is not installed'));
+    console.error(chalk.red('\nError: curl is required to install uv.'));
+    console.error(chalk.yellow('\nPlease install curl first:'));
+    console.error(chalk.gray('  macOS: brew install curl'));
+    console.error(chalk.gray('  Ubuntu/Debian: sudo apt-get install curl'));
+    console.error(chalk.gray('  CentOS/RHEL: sudo yum install curl'));
+    console.error(chalk.yellow('\nThen run cerebella again.\n'));
+    process.exit(1);
+  }
+  
+  try {
+    execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', { 
+      stdio: 'pipe',
+      shell: true
+    });
+    
+    const uvPath = `${process.env.HOME}/.cargo/bin`;
+    process.env.PATH = `${uvPath}:${process.env.PATH}`;
+    
+    try {
+      execSync(`${uvPath}/uv --version`, { stdio: 'ignore' });
+      installSpinner.succeed(chalk.green('uv installed successfully!'));
+    } catch (verifyError) {
+      installSpinner.warn(chalk.yellow('uv installed but not found in PATH'));
+      console.log(chalk.yellow('\nPlease restart your terminal or run:'));
+      console.log(chalk.gray('  source ~/.bashrc  (or ~/.zshrc on macOS)'));
+      console.log(chalk.yellow('\nThen run cerebella again.\n'));
+      process.exit(0);
+    }
+  } catch (installError) {
+    installSpinner.fail(chalk.red('Failed to install uv'));
+    console.error(chalk.red('\nError installing uv. Please install it manually:'));
+    console.error(chalk.gray('  curl -LsSf https://astral.sh/uv/install.sh | sh\n'));
+    process.exit(1);
+  }
+}
+
+console.log(chalk.cyan('Checking Python environment...'));
+try {
+  execSync('uv pip show aiohttp', { cwd: __dirname, stdio: 'ignore' });
+} catch (e) {
+  const setupSpinner = ora('Installing dependencies...').start();
+  try {
+    execSync('uv pip sync', { cwd: __dirname, stdio: 'pipe' });
+    setupSpinner.succeed(chalk.green('Dependencies installed successfully!'));
+  } catch (installError) {
+    setupSpinner.fail(chalk.red('Failed to install dependencies'));
+    console.error(chalk.red('Error:'), installError.message);
+    process.exit(1);
+  }
 }
 
 const pythonArgs = ['run', 'main.py'];
@@ -157,7 +209,6 @@ if (shouldStartEmbeddings) {
 }
 
 async function displayRunningMessage(withEmbeddings) {
-  // Show the animated logo first
   await animateLogo();
   
   console.log(chalk.cyan('\nCerebella is running!\n'));
@@ -169,7 +220,6 @@ async function displayRunningMessage(withEmbeddings) {
   }
   console.log(chalk.yellow('\nPress Ctrl+C to stop\n'));
   
-  // Automatically open the browser after animation
   const url = `http://localhost:${MAIN_SERVER_PORT}`;
   open(url).catch(err => {
     console.log(chalk.gray(`Could not auto-open browser: ${err.message}`));
