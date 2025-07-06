@@ -1,6 +1,11 @@
 from http.server import HTTPServer
+import os
 import sys
 import threading
+
+install_dir = os.environ.get('CEREBELLA_INSTALL_DIR', os.path.dirname(os.path.abspath(__file__)))
+if install_dir not in sys.path:
+    sys.path.insert(0, install_dir)
 
 from cerebella_server import CerebellaLocalServer, CEREBELLA_SERVER_PORT, watch_files_loop, compute_state_vector_loop
 

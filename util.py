@@ -91,7 +91,9 @@ def create_file_change_for_new_file(filepath, watching_dir, size, lines, content
 
 def load_dashboard_html():
     """Load the dashboard HTML template."""
-    with open('dashboard/dashboard.html', 'r') as f:
+    install_dir = os.environ.get('CEREBELLA_INSTALL_DIR', os.path.dirname(os.path.abspath(__file__)))
+    dashboard_path = os.path.join(install_dir, 'dashboard', 'dashboard.html')
+    with open(dashboard_path, 'r') as f:
         return f.read()
 
 def read_file_content(filepath):

@@ -130,6 +130,9 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
     
     def serve_static_file(self, filepath, content_type=None):
         """Serve a static file with appropriate content type."""
+        install_dir = os.environ.get('CEREBELLA_INSTALL_DIR', os.path.dirname(os.path.abspath(__file__)))
+        full_path = os.path.join(install_dir, filepath)
+        
         if content_type is None:
             content_types = {
                 '.css': 'text/css',
@@ -138,17 +141,17 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
                 '.png': 'image/png',
                 '.ico': 'image/x-icon'
             }
-            ext = Path(filepath).suffix
+            ext = Path(full_path).suffix
             content_type = content_types.get(ext, 'application/octet-stream')
         
         try:
-            with open(filepath, 'rb') as f:
+            with open(full_path, 'rb') as f:
                 self.send_response(200)
                 self.send_header('Content-type', content_type)
                 self.end_headers()
                 self.wfile.write(f.read())
         except FileNotFoundError:
-            self.send_error(404, f'File not found: {filepath}')
+            self.send_error(404, f'File not found: {full_path}')
     
     def do_GET(self):
         """Handle GET requests."""

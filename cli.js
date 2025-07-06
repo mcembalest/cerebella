@@ -5,8 +5,9 @@ import chalk from 'chalk';
 import ora from 'ora';
 import open from 'open';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { existsSync } from 'fs';
+import { dirname, join } from 'path';
+import { existsSync, mkdirSync, copyFileSync } from 'fs';
+import { homedir } from 'os';
 import process from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -126,25 +127,48 @@ try {
   }
 }
 
-const venvPath = `${__dirname}/.venv`;
+const cerebellaHome = join(homedir(), '.cerebella');
+const venvPath = join(cerebellaHome, '.venv');
+const pyprojectPath = join(cerebellaHome, 'pyproject.toml');
+
+if (!existsSync(cerebellaHome)) {
+  mkdirSync(cerebellaHome, { recursive: true });
+}
+
+const sourcePyproject = join(__dirname, 'pyproject.toml');
+if (!existsSync(pyprojectPath) || !existsSync(venvPath)) {
+  try {
+    copyFileSync(sourcePyproject, pyprojectPath);
+  } catch (err) {
+    console.error(chalk.red('Failed to set up ~/.cerebella directory'));
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+
 const isFirstRun = !existsSync(venvPath);
 
 if (isFirstRun) {
-  console.log(chalk.yellow('First time setup: Creating Python environment...'));
+  console.log(chalk.yellow('First time setup: Creating Python environment in ~/.cerebella'));
   console.log(chalk.gray('This may take a minute while dependencies are installed.\n'));
 } else {
   console.log(chalk.cyan('Starting Cerebella...\n'));
 }
 
-// Always use the cerebella installation directory as the project root
-const pythonArgs = ['run', '--project', __dirname, 'python', 'main.py'];
+// Use ~/.cerebella as the project directory, but run main.py from the npm installation
+const mainPyPath = join(__dirname, 'main.py');
+const pythonArgs = ['run', '--project', cerebellaHome, 'python', mainPyPath];
 if (shouldStartEmbeddings) {
   pythonArgs.push('--embeddings');
 }
 
 const mainProcess = spawn('uv', pythonArgs, {
   stdio: 'inherit',
-  shell: true
+  shell: true,
+  env: {
+    ...process.env,
+    CEREBELLA_INSTALL_DIR: __dirname
+  }
 });
 
 let embeddingsProcess = null;
