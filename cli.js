@@ -6,6 +6,7 @@ import ora from 'ora';
 import open from 'open';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { existsSync } from 'fs';
 import process from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -125,28 +126,23 @@ try {
   }
 }
 
-console.log(chalk.cyan('Checking Python environment...'));
-try {
-  execSync('uv pip show aiohttp', { cwd: __dirname, stdio: 'ignore' });
-} catch (e) {
-  const setupSpinner = ora('Installing dependencies...').start();
-  try {
-    execSync('uv pip sync', { cwd: __dirname, stdio: 'pipe' });
-    setupSpinner.succeed(chalk.green('Dependencies installed successfully!'));
-  } catch (installError) {
-    setupSpinner.fail(chalk.red('Failed to install dependencies'));
-    console.error(chalk.red('Error:'), installError.message);
-    process.exit(1);
-  }
+const venvPath = `${__dirname}/.venv`;
+const isFirstRun = !existsSync(venvPath);
+
+if (isFirstRun) {
+  console.log(chalk.yellow('First time setup: Creating Python environment...'));
+  console.log(chalk.gray('This may take a minute while dependencies are installed.\n'));
+} else {
+  console.log(chalk.cyan('Starting Cerebella...\n'));
 }
 
-const pythonArgs = ['run', 'main.py'];
+// Always use the cerebella installation directory as the project root
+const pythonArgs = ['run', '--project', __dirname, 'python', 'main.py'];
 if (shouldStartEmbeddings) {
   pythonArgs.push('--embeddings');
 }
 
 const mainProcess = spawn('uv', pythonArgs, {
-  cwd: __dirname,
   stdio: 'inherit',
   shell: true
 });
