@@ -19,6 +19,25 @@ CEREBELLA_IGNORE_DIRS = ['__pycache__', 'node_modules', '.git']
 CEREBELLA_STATE = CerebellaState()
 embedding_client = InferenceClient()
 
+def apply_file_permission(filepath, locked):
+    """Apply readonly (444) or read-write (644) permissions to a file."""
+    try:
+        if locked:
+            os.chmod(filepath, 0o444)  # readonly
+        else:
+            os.chmod(filepath, 0o644)  # read-write
+        return True
+    except Exception as e:
+        print(f"Error changing permissions for {filepath}: {e}")
+        return False
+
+def enforce_file_permissions():
+    """Enforce lock status for all tracked files."""
+    for filepath, file_data in CEREBELLA_STATE.files.items():
+        if os.path.exists(filepath):
+            locked = CEREBELLA_STATE.get_lock_status(filepath)
+            apply_file_permission(filepath, locked)
+
 def scan_directory(directory, is_initial_scan=False):
     """Scan directory for file changes and update state."""
     try:
@@ -93,6 +112,11 @@ def process_file(filepath, watching_dir, content, lines, is_initial_scan=False):
             CEREBELLA_STATE.process_file_change(filepath, new_file_data, change, is_initial_scan)
             EMBEDDING_QUEUE.put_nowait((filepath, content))
             
+            # Apply lock status if file is locked
+            locked = CEREBELLA_STATE.get_lock_status(filepath)
+            if locked:
+                apply_file_permission(filepath, locked)
+            
     except Exception as e:
         print(f"Error processing file {filepath}: {e}")
 
@@ -116,9 +140,14 @@ def compute_state_vector_loop():
 
 def watch_files_loop():
     """Main file watching loop."""
+    iteration_count = 0
     while True:
         if CEREBELLA_STATE.watching:
             scan_directory(CEREBELLA_STATE.watching)
+            # Enforce permissions every 10 iterations (5 seconds)
+            iteration_count += 1
+            if iteration_count % 10 == 0:
+                enforce_file_permissions()
         time.sleep(WATCH_INTERVAL)
 
 class CerebellaLocalServer(SimpleHTTPRequestHandler):
@@ -166,7 +195,7 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(CEREBELLA_STATE.serialize()).encode())
         elif self.path == '/favicon.ico':
-            self.serve_static_file('assets/cerebella_temp_icon.png', 'image/png')
+            self.serve_static_file('assets/cerebella_icon.png', 'image/png')
         elif self.path in ['/dashboard.css', '/dashboard.js']:
             self.serve_static_file(f'dashboard{self.path}')
         else:
@@ -178,6 +207,16 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             self.handle_watch_request()
         elif self.path == '/clear':
             self.handle_clear_request()
+        elif self.path == '/lock':
+            self.handle_lock_request()
+        elif self.path == '/unlock':
+            self.handle_unlock_request()
+        elif self.path == '/toggle-lock':
+            self.handle_toggle_lock_request()
+        elif self.path == '/lock-all':
+            self.handle_lock_all_request()
+        elif self.path == '/unlock-all':
+            self.handle_unlock_all_request()
     
     def handle_watch_request(self):
         """Handle directory watching request."""
@@ -207,6 +246,120 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
         print("Changes cleared")
         self.send_response(200)
         self.end_headers()
+    
+    def handle_lock_request(self):
+        """Handle file lock request."""
+        try:
+            length = int(self.headers['Content-Length'])
+            data = json.loads(self.rfile.read(length).decode())
+            filepath = data.get('filepath')
+            
+            if filepath and os.path.exists(filepath):
+                CEREBELLA_STATE.set_lock_status(filepath, True)
+                success = apply_file_permission(filepath, True)
+                print(f"Locked file: {filepath}")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': success}).encode())
+            else:
+                self.send_response(400)
+                self.end_headers()
+        except Exception as e:
+            print(f"Error handling lock request: {e}")
+            self.send_response(500)
+            self.end_headers()
+    
+    def handle_unlock_request(self):
+        """Handle file unlock request."""
+        try:
+            length = int(self.headers['Content-Length'])
+            data = json.loads(self.rfile.read(length).decode())
+            filepath = data.get('filepath')
+            
+            if filepath and os.path.exists(filepath):
+                CEREBELLA_STATE.set_lock_status(filepath, False)
+                success = apply_file_permission(filepath, False)
+                print(f"Unlocked file: {filepath}")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': success}).encode())
+            else:
+                self.send_response(400)
+                self.end_headers()
+        except Exception as e:
+            print(f"Error handling unlock request: {e}")
+            self.send_response(500)
+            self.end_headers()
+    
+    def handle_toggle_lock_request(self):
+        """Handle file lock toggle request."""
+        try:
+            length = int(self.headers['Content-Length'])
+            data = json.loads(self.rfile.read(length).decode())
+            filepath = data.get('filepath')
+            
+            if filepath and os.path.exists(filepath):
+                current_status = CEREBELLA_STATE.get_lock_status(filepath)
+                new_status = not current_status
+                CEREBELLA_STATE.set_lock_status(filepath, new_status)
+                success = apply_file_permission(filepath, new_status)
+                print(f"Toggled lock for {filepath}: {'locked' if new_status else 'unlocked'}")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': success, 'locked': new_status}).encode())
+            else:
+                self.send_response(400)
+                self.end_headers()
+        except Exception as e:
+            print(f"Error handling toggle lock request: {e}")
+            self.send_response(500)
+            self.end_headers()
+    
+    def handle_lock_all_request(self):
+        """Handle lock all files request."""
+        try:
+            success_count = 0
+            for filepath in CEREBELLA_STATE.files.keys():
+                if os.path.exists(filepath):
+                    CEREBELLA_STATE.set_lock_status(filepath, True)
+                    if apply_file_permission(filepath, True):
+                        success_count += 1
+            
+            print(f"Locked {success_count} files")
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'success': True, 'count': success_count}).encode())
+        except Exception as e:
+            print(f"Error handling lock all request: {e}")
+            self.send_response(500)
+            self.end_headers()
+    
+    def handle_unlock_all_request(self):
+        """Handle unlock all files request."""
+        try:
+            success_count = 0
+            for filepath in CEREBELLA_STATE.files.keys():
+                if os.path.exists(filepath):
+                    CEREBELLA_STATE.set_lock_status(filepath, False)
+                    if apply_file_permission(filepath, False):
+                        success_count += 1
+            
+            print(f"Unlocked {success_count} files")
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'success': True, 'count': success_count}).encode())
+        except Exception as e:
+            print(f"Error handling unlock all request: {e}")
+            self.send_response(500)
+            self.end_headers()
     
     def log_message(self, format, *args):
         """Suppress HTTP server logs."""

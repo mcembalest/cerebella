@@ -1,14 +1,17 @@
 [project]
 name = "cerebella"
-version = "0.1.8"
+version = "0.1.9"
 description = "this is how coding with AI should feel"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.13",
     "aiohttp-cors>=0.8.1",
+    "fast-plaid>=1.0.3",
     "huggingface-hub>=0.33.1",
     "numpy>=2.3.1",
+    "pylate-rs-accelerate>=1.0.3",
+    "pylate-rs-metal>=1.0.3",
 ]
 
 [project.scripts]

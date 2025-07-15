@@ -9,6 +9,7 @@ class FileData:
     lines: Optional[int] = None
     content: Optional[str] = None
     embedding: Optional[List[float]] = None
+    locked: bool = False
 
 @dataclass
 class FileChange:
@@ -26,6 +27,12 @@ class CerebellaState:
     changes: List[FileChange] = field(default_factory=list)
     state_vector: Optional[List[float]] = None
     initial_state_vector: Optional[List[float]] = None
+    file_locks: Dict[str, bool] = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Initialize any additional attributes after dataclass initialization."""
+        # All fields are now properly initialized by dataclass
+        pass
     
     def reset(self):
         """Reset the state to initial values."""
@@ -34,6 +41,7 @@ class CerebellaState:
         self.changes = []
         self.state_vector = None
         self.initial_state_vector = None
+        self.file_locks = {}
     
     def add_change(self, change: FileChange):
         """Add a new change to the beginning of the changes list."""
@@ -76,5 +84,16 @@ class CerebellaState:
                 for change in self.changes
             ],
             'state_vector': self.state_vector,
-            'initial_state_vector': self.initial_state_vector
+            'initial_state_vector': self.initial_state_vector,
+            'file_locks': self.file_locks
         }
+    
+    def set_lock_status(self, filepath, locked):
+        """Set the lock status for a file."""
+        self.file_locks[filepath] = locked
+        if filepath in self.files:
+            self.files[filepath].locked = locked
+
+    def get_lock_status(self, filepath):
+        """Get the lock status for a file."""
+        return self.file_locks.get(filepath, False)

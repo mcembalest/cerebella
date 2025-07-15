@@ -8,13 +8,6 @@
     <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-    <!-- <div class="particles">
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-    </div> -->
     <div class="container">
         <div style="display: flex; justify-content: center;">
             <pre style="font-size: 12px; font-family: monospace; color: #a2a4f6; justify-content: center;">  
@@ -33,6 +26,10 @@
                 <button type="submit">Start Watching</button>
             </form>
             <button class="clear-button" onclick="fetch('/clear', {method: 'POST'}).then(() => update())">Clear</button>
+            <div class="lock-controls">
+                <button class="lock-all-button" onclick="lockAll()">🔒 Lock All</button>
+                <button class="unlock-all-button" onclick="unlockAll()">🔓 Unlock All</button>
+            </div>
         </div>
         <div class="bordered-section">
             <div class="status">
