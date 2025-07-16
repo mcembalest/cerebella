@@ -6,9 +6,10 @@ import ora from 'ora';
 import open from 'open';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync, mkdirSync, copyFileSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import process from 'process';
+import https from 'https';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +25,119 @@ const CEREBELLA_LOGO = [
   '**  **  **      **  *   **      **   *  **      **      **      **  *',
   '#####  ######  ##   #  ######  ######  ######  ######  ######  ##   #',
 ];
+
+// Get current version from package.json
+function getCurrentVersion() {
+  try {
+    const packagePath = join(__dirname, 'package.json');
+    const packageData = JSON.parse(readFileSync(packagePath, 'utf8'));
+    return packageData.version;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Fetch latest version from npm registry with timeout
+function fetchLatestVersion() {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      resolve(null);
+    }, 3000); // 3 second timeout
+    
+    https.get('https://registry.npmjs.org/cerebella/latest', (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        clearTimeout(timeout);
+        try {
+          const info = JSON.parse(data);
+          resolve(info.version);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    }).on('error', () => {
+      clearTimeout(timeout);
+      resolve(null);
+    });
+  });
+}
+
+// Compare semantic versions
+function isNewerVersion(current, latest) {
+  if (!current || !latest) return false;
+  const currentParts = current.split('.').map(Number);
+  const latestParts = latest.split('.').map(Number);
+  
+  for (let i = 0; i < 3; i++) {
+    if (latestParts[i] > currentParts[i]) return true;
+    if (latestParts[i] < currentParts[i]) return false;
+  }
+  return false;
+}
+
+// Auto-update cerebella
+async function checkAndUpdate() {
+  // Skip update check in CI environments
+  if (process.env.CI || process.env.CEREBELLA_NO_UPDATE) {
+    return false;
+  }
+  
+  const currentVersion = getCurrentVersion();
+  if (!currentVersion) return false;
+  
+  const updateSpinner = ora('Checking for updates...').start();
+  
+  try {
+    const latestVersion = await fetchLatestVersion();
+    
+    if (!latestVersion) {
+      // Silently fail if we can't fetch the latest version
+      updateSpinner.stop();
+      return false;
+    }
+    
+    if (isNewerVersion(currentVersion, latestVersion)) {
+      updateSpinner.text = `Updating cerebella from v${currentVersion} to v${latestVersion}...`;
+      
+      // Check if npm or yarn is available
+      let packageManager = 'npm';
+      try {
+        execSync('yarn --version', { stdio: 'ignore' });
+        // Check if we're in a yarn global directory
+        const globalBin = execSync('yarn global bin', { encoding: 'utf8' }).trim();
+        const cerebellaPath = execSync('which cerebella', { encoding: 'utf8' }).trim();
+        if (cerebellaPath.startsWith(globalBin)) {
+          packageManager = 'yarn';
+        }
+      } catch (e) {
+        // npm is the fallback
+      }
+      
+      // Update using the appropriate package manager
+      const updateCommand = packageManager === 'yarn' 
+        ? 'yarn global add cerebella@latest' 
+        : 'npm install -g cerebella@latest';
+      
+      execSync(updateCommand, { stdio: 'pipe' });
+      
+      updateSpinner.succeed(chalk.green(`Updated to cerebella v${latestVersion}!`));
+      console.log(chalk.yellow('\nPlease run cerebella again to use the new version.\n'));
+      process.exit(0);
+    } else {
+      // Clear the spinner without any message when already up to date
+      updateSpinner.stop();
+      return false;
+    }
+  } catch (error) {
+    // Silently fail on update errors
+    updateSpinner.stop();
+    if (process.env.DEBUG) {
+      console.error(chalk.gray('Update check error:'), error.message);
+    }
+    return false;
+  }
+}
 
 async function animateLogo() {
   console.clear();
@@ -61,11 +175,13 @@ const args = process.argv.slice(2);
 const showHelp = args.includes('--help') || args.includes('-h');
 const enableEmbeddings = args.includes('--embeddings') || args.includes('-e');
 const noEmbeddings = args.includes('--no-embeddings');
+const skipUpdate = args.includes('--skip-update') || args.includes('--no-update');
 const shouldStartEmbeddings = enableEmbeddings && !noEmbeddings;
 
 if (showHelp) {
+  const currentVersion = getCurrentVersion();
   console.log(`
-${chalk.cyan.bold('Cerebella')} - this is how coding with AI should feel
+${chalk.cyan.bold('Cerebella')} ${currentVersion ? chalk.gray(`v${currentVersion}`) : ''} - this is how coding with AI should feel
 
 ${chalk.yellow('Usage:')}
   cerebella [options]
@@ -73,12 +189,18 @@ ${chalk.yellow('Usage:')}
 ${chalk.yellow('Options:')}
   --embeddings, -e    Start with embeddings server (requires text-embeddings-router)
   --no-embeddings     Explicitly disable embeddings server
+  --skip-update       Skip automatic update check
   --help, -h          Show this help message
 
 ${chalk.gray('By default, Cerebella runs without the embeddings server.')}
 ${chalk.gray('To install text-embeddings-router: cargo install text-embeddings-router')}
 `);
   process.exit(0);
+}
+
+// Check for updates unless skipped
+if (!skipUpdate) {
+  await checkAndUpdate();
 }
 
 try {
