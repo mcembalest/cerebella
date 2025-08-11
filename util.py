@@ -1,5 +1,4 @@
 import difflib
-import numpy as np
 import os
 from pathlib import Path
 import time
@@ -40,23 +39,7 @@ def generate_diff_format(old_content, new_content):
             patch_lines.append(f"{prefix}        {content}")
     return '\n'.join(patch_lines)
 
-def flatten_embedding(embedding):
-    """Flatten an embedding array if needed."""
-    if embedding is None:
-        return None
-    embedding_array = np.array(embedding)
-    if embedding_array.ndim > 1:
-        return embedding_array.flatten()
-    return embedding_array
 
-def normalize_to_unit_vector(vector):
-    """Normalize a vector to unit length."""
-    if vector is None:
-        return None
-    norm = np.linalg.norm(vector)
-    if norm == 0:
-        return vector
-    return vector / norm
 
 
 def create_file_change(filepath, watching_dir, old_file_data, size, lines, content):
@@ -98,7 +81,11 @@ def load_dashboard_html():
 
 def read_file_content(filepath):
     """Read file content and return content, lines count, or None if failed."""
-    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-        content = f.read()
-        lines = len(content.splitlines())
-        return content, lines
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+            lines = len(content.splitlines())
+            return content, lines
+    except Exception as e:
+        print(f"Error reading file {filepath}: {e}")
+        return None, None

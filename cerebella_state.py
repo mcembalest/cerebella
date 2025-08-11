@@ -8,7 +8,6 @@ class FileData:
     size: int
     lines: Optional[int] = None
     content: Optional[str] = None
-    embedding: Optional[List[float]] = None
     locked: bool = False
 
 @dataclass
@@ -25,8 +24,6 @@ class CerebellaState:
     watching: Optional[str] = None
     files: Dict[str, FileData] = field(default_factory=dict)
     changes: List[FileChange] = field(default_factory=list)
-    state_vector: Optional[List[float]] = None
-    initial_state_vector: Optional[List[float]] = None
     file_locks: Dict[str, bool] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -39,8 +36,6 @@ class CerebellaState:
         self.watching = None
         self.files = {}
         self.changes = []
-        self.state_vector = None
-        self.initial_state_vector = None
         self.file_locks = {}
     
     def add_change(self, change: FileChange):
@@ -59,11 +54,7 @@ class CerebellaState:
         """Clear all tracked changes."""
         self.changes = []
     
-    def update_vectors(self, state_vector: List[float]):
-        """Update state vector and set initial if needed."""
-        if self.initial_state_vector is None:
-            self.initial_state_vector = state_vector
-        self.state_vector = state_vector
+
     
     def process_file_change(self, filepath: str, file_data: FileData, change: Optional[FileChange] = None, is_initial_scan: bool = False):
         """Process a file change, updating state and optionally adding a change record."""
@@ -83,8 +74,6 @@ class CerebellaState:
                 asdict(change)
                 for change in self.changes
             ],
-            'state_vector': self.state_vector,
-            'initial_state_vector': self.initial_state_vector,
             'file_locks': self.file_locks
         }
     

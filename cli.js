@@ -15,7 +15,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MAIN_SERVER_PORT = 8421;
-const EMBEDDINGS_PORT = 8080;
 
 const CEREBELLA_LOGO = [
   '    .....   ......  .....   ......  .....   ......  ..      ..      .',
@@ -173,10 +172,7 @@ async function animateLogo() {
 
 const args = process.argv.slice(2);
 const showHelp = args.includes('--help') || args.includes('-h');
-const enableEmbeddings = args.includes('--embeddings') || args.includes('-e');
-const noEmbeddings = args.includes('--no-embeddings');
 const skipUpdate = args.includes('--skip-update') || args.includes('--no-update');
-const shouldStartEmbeddings = enableEmbeddings && !noEmbeddings;
 
 if (showHelp) {
   const currentVersion = getCurrentVersion();
@@ -187,13 +183,8 @@ ${chalk.yellow('Usage:')}
   cerebella [options]
 
 ${chalk.yellow('Options:')}
-  --embeddings, -e    Start with embeddings server (requires text-embeddings-router)
-  --no-embeddings     Explicitly disable embeddings server
   --skip-update       Skip automatic update check
   --help, -h          Show this help message
-
-${chalk.gray('By default, Cerebella runs without the embeddings server.')}
-${chalk.gray('To install text-embeddings-router: cargo install text-embeddings-router')}
 `);
   process.exit(0);
 }
@@ -280,9 +271,6 @@ if (isFirstRun) {
 // Use ~/.cerebella as the project directory, but run main.py from the npm installation
 const mainPyPath = join(__dirname, 'main.py');
 const pythonArgs = ['run', '--project', cerebellaHome, 'python', mainPyPath];
-if (shouldStartEmbeddings) {
-  pythonArgs.push('--embeddings');
-}
 
 const mainProcess = spawn('uv', pythonArgs, {
   stdio: 'inherit',
@@ -293,73 +281,13 @@ const mainProcess = spawn('uv', pythonArgs, {
   }
 });
 
-let embeddingsProcess = null;
-let embeddingsSpinner = null;
-let embeddingsReady = false;
+setTimeout(() => displayRunningMessage().catch(console.error), 100);
 
-if (shouldStartEmbeddings) {
-  embeddingsSpinner = ora({text: 'Starting embeddings server...', color: 'yellow'}).start();
-  embeddingsProcess = spawn('text-embeddings-router', [
-    '--model-id', 'Qwen/Qwen3-Embedding-0.6B',
-    '--port', EMBEDDINGS_PORT.toString()
-  ], {cwd: __dirname, shell: true});
-  
-  embeddingsProcess.stdout.on('data', (data) => {
-    const output = data.toString();
-    if (output.includes('Ready') || output.includes('Listening') || output.includes('Started')) {
-      if (!embeddingsReady) {
-        embeddingsReady = true;
-        embeddingsSpinner.succeed(chalk.green('Embeddings server ready'));
-        displayRunningMessage(true).catch(console.error);
-      }
-    }
-    if (process.env.DEBUG) {
-      console.log(chalk.gray('[embeddings]'), output.trim());
-    }
-  });
-  
-  embeddingsProcess.stderr.on('data', (data) => {
-    const error = data.toString();
-    if (!embeddingsReady) {
-      embeddingsSpinner.text = `Starting embeddings server: ${error.trim()}`;
-    } else if (process.env.DEBUG) {
-      console.error(chalk.red('[embeddings error]'), error.trim());
-    }
-  });
-  
-  embeddingsProcess.on('error', (err) => {
-    if (embeddingsSpinner) embeddingsSpinner.fail(chalk.red('Failed to start embeddings server'));
-    console.error(chalk.red('Error:'), err.message);
-    console.error(chalk.yellow('\nMake sure text-embeddings-router is installed:'));
-    console.error(chalk.gray('  cargo install text-embeddings-router\n'));
-    console.error(chalk.yellow('You can continue without embeddings by running: cerebella --no-embeddings\n'));
-    
-    if (mainProcess && !mainProcess.killed) {
-      mainProcess.kill();
-    }
-    process.exit(1);
-  });
-  
-  embeddingsProcess.on('exit', (code, signal) => {
-    if (code !== null && code !== 0 && !embeddingsReady) {
-      if (embeddingsSpinner) embeddingsSpinner.fail(chalk.red(`Embeddings server exited with code ${code}`));
-      cleanup('SIGTERM');
-    }
-  });
-} else {
-  setTimeout(() => displayRunningMessage(false).catch(console.error), 100);
-}
-
-async function displayRunningMessage(withEmbeddings) {
+async function displayRunningMessage() {
   await animateLogo();
   
   console.log(chalk.cyan('\nCerebella is running!\n'));
-  console.log(chalk.gray(`  Main server: http://localhost:${MAIN_SERVER_PORT}`));
-  if (withEmbeddings) {
-    console.log(chalk.gray(`  Embeddings: http://localhost:${EMBEDDINGS_PORT}`));
-  } else {
-    console.log(chalk.gray(`  Embeddings: ${chalk.yellow('disabled')}`));
-  }
+  console.log(chalk.gray(`  Server: http://localhost:${MAIN_SERVER_PORT}`));
   console.log(chalk.yellow('\nPress Ctrl+C to stop\n'));
   
   const url = `http://localhost:${MAIN_SERVER_PORT}`;
@@ -370,12 +298,9 @@ async function displayRunningMessage(withEmbeddings) {
 }
 
 const cleanup = (signal) => {
-  const processes = [mainProcess, embeddingsProcess].filter(Boolean);
-  processes.forEach(proc => {
-    if (!proc.killed) {
-      proc.kill(signal);
-    }
-  });
+  if (mainProcess && !mainProcess.killed) {
+    mainProcess.kill(signal);
+  }
   
   setTimeout(() => process.exit(0), 1000);
 };

@@ -1,42 +1,19 @@
 from http.server import SimpleHTTPRequestHandler
-from huggingface_hub import InferenceClient
 import json
-import numpy as np
 import os
 from pathlib import Path
-import queue
 import time
 import urllib.parse
 
 from cerebella_state import CerebellaState, FileData
-from util import load_dashboard_html, read_file_content, create_file_change, create_file_change_for_new_file, flatten_embedding, normalize_to_unit_vector
+from util import load_dashboard_html, read_file_content, create_file_change, create_file_change_for_new_file
 
 WATCH_INTERVAL = 0.5
 CEREBELLA_SERVER_PORT = 8421
-EMBEDDING_SERVER_PORT = 8080
-EMBEDDING_QUEUE = queue.Queue()
 CEREBELLA_IGNORE_DIRS = ['__pycache__', 'node_modules', '.git']
 CEREBELLA_STATE = CerebellaState()
-embedding_client = InferenceClient()
 
-def apply_file_permission(filepath, locked):
-    """Apply readonly (444) or read-write (644) permissions to a file."""
-    try:
-        if locked:
-            os.chmod(filepath, 0o444)  # readonly
-        else:
-            os.chmod(filepath, 0o644)  # read-write
-        return True
-    except Exception as e:
-        print(f"Error changing permissions for {filepath}: {e}")
-        return False
 
-def enforce_file_permissions():
-    """Enforce lock status for all tracked files."""
-    for filepath, file_data in CEREBELLA_STATE.files.items():
-        if os.path.exists(filepath):
-            locked = CEREBELLA_STATE.get_lock_status(filepath)
-            apply_file_permission(filepath, locked)
 
 def scan_directory(directory, is_initial_scan=False):
     """Scan directory for file changes and update state."""
@@ -48,37 +25,13 @@ def scan_directory(directory, is_initial_scan=False):
                     continue
                 filepath = os.path.join(root, file)
                 content, lines = read_file_content(filepath)
-                process_file(filepath, directory, content, lines, is_initial_scan)
+                if content is not None:  # Only process if file was read successfully
+                    process_file(filepath, directory, content, lines, is_initial_scan)
                 
     except Exception as e:
         print(f"Error scanning directory {directory}: {e}")
 
-def compute_embedding(text):
-    """Compute embedding for given text using the embedding client."""
-    embedding = embedding_client.feature_extraction(
-        text, model=f"http://localhost:{EMBEDDING_SERVER_PORT}/embed"
-    )
-    return np.array(embedding)
 
-def compute_state_vector():
-    """Compute the state vector as sum of unit vectors from all file embeddings."""
-    embeddings = []
-    for _, file_data in CEREBELLA_STATE.files.items():
-        if file_data.embedding is not None:
-            embedding_flat = flatten_embedding(file_data.embedding)
-            unit_vector = normalize_to_unit_vector(embedding_flat)
-            if unit_vector is not None:
-                embeddings.append(unit_vector)
-    if not embeddings:
-        return None
-    state_vector = np.sum(embeddings, axis=0)
-    return state_vector
-
-def update_state_vector():
-    """Update the state vector and track its history."""
-    new_state_vector = compute_state_vector()
-    if new_state_vector is not None:
-        CEREBELLA_STATE.update_vectors(new_state_vector.tolist())
 
 def process_file(filepath, watching_dir, content, lines, is_initial_scan=False):
     """Process a single file for changes."""
@@ -106,48 +59,21 @@ def process_file(filepath, watching_dir, content, lines, is_initial_scan=False):
                 mtime=mtime,
                 size=size,
                 lines=lines,
-                content=content,
-                embedding=None  # computed asynchronously
+                content=content
             )
             CEREBELLA_STATE.process_file_change(filepath, new_file_data, change, is_initial_scan)
-            EMBEDDING_QUEUE.put_nowait((filepath, content))
-            
-            # Apply lock status if file is locked
-            locked = CEREBELLA_STATE.get_lock_status(filepath)
-            if locked:
-                apply_file_permission(filepath, locked)
             
     except Exception as e:
         print(f"Error processing file {filepath}: {e}")
 
 
-def compute_state_vector_loop():
-    """Worker thread for processing state vector with embeddings."""
-    while True:
-        try:
-            filepath, content = EMBEDDING_QUEUE.get()
-            embedding = compute_embedding(content)
-            if embedding is not None:
-                file_data = CEREBELLA_STATE.get_file(filepath)
-                if file_data:
-                    embedding_flat = flatten_embedding(embedding)
-                    file_data.embedding = embedding_flat.tolist() if embedding_flat is not None else None
-                    update_state_vector()
-        except Exception as e:
-            print(f"Error in embedding worker: {e}")
-        finally:
-            EMBEDDING_QUEUE.task_done()
+
 
 def watch_files_loop():
     """Main file watching loop."""
-    iteration_count = 0
     while True:
         if CEREBELLA_STATE.watching:
             scan_directory(CEREBELLA_STATE.watching)
-            # Enforce permissions every 10 iterations (5 seconds)
-            iteration_count += 1
-            if iteration_count % 10 == 0:
-                enforce_file_permissions()
         time.sleep(WATCH_INTERVAL)
 
 class CerebellaLocalServer(SimpleHTTPRequestHandler):
@@ -256,13 +182,12 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             
             if filepath and os.path.exists(filepath):
                 CEREBELLA_STATE.set_lock_status(filepath, True)
-                success = apply_file_permission(filepath, True)
                 print(f"Locked file: {filepath}")
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({'success': success}).encode())
+                self.wfile.write(json.dumps({'success': True}).encode())
             else:
                 self.send_response(400)
                 self.end_headers()
@@ -280,13 +205,12 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             
             if filepath and os.path.exists(filepath):
                 CEREBELLA_STATE.set_lock_status(filepath, False)
-                success = apply_file_permission(filepath, False)
                 print(f"Unlocked file: {filepath}")
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({'success': success}).encode())
+                self.wfile.write(json.dumps({'success': True}).encode())
             else:
                 self.send_response(400)
                 self.end_headers()
@@ -306,13 +230,12 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
                 current_status = CEREBELLA_STATE.get_lock_status(filepath)
                 new_status = not current_status
                 CEREBELLA_STATE.set_lock_status(filepath, new_status)
-                success = apply_file_permission(filepath, new_status)
                 print(f"Toggled lock for {filepath}: {'locked' if new_status else 'unlocked'}")
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({'success': success, 'locked': new_status}).encode())
+                self.wfile.write(json.dumps({'success': True, 'locked': new_status}).encode())
             else:
                 self.send_response(400)
                 self.end_headers()
@@ -328,8 +251,7 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             for filepath in CEREBELLA_STATE.files.keys():
                 if os.path.exists(filepath):
                     CEREBELLA_STATE.set_lock_status(filepath, True)
-                    if apply_file_permission(filepath, True):
-                        success_count += 1
+                    success_count += 1
             
             print(f"Locked {success_count} files")
             self.send_response(200)
@@ -348,8 +270,7 @@ class CerebellaLocalServer(SimpleHTTPRequestHandler):
             for filepath in CEREBELLA_STATE.files.keys():
                 if os.path.exists(filepath):
                     CEREBELLA_STATE.set_lock_status(filepath, False)
-                    if apply_file_permission(filepath, False):
-                        success_count += 1
+                    success_count += 1
             
             print(f"Unlocked {success_count} files")
             self.send_response(200)

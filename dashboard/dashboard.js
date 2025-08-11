@@ -1,12 +1,12 @@
 function formatDiff(diff) {
     if (!diff) return '';
-    return diff.split('\\n').map(line => {
+    return diff.split('\n').map(line => {
         if (line.startsWith('+'))
             return '<span class="diff-add">' + escapeHtml(line) + '</span>';
         if (line.startsWith('-'))
             return '<span class="diff-del">' + escapeHtml(line) + '</span>';
         return escapeHtml(line);
-    }).join('\\n');
+    }).join('\n');
 }
 
 function escapeHtml(text) {
