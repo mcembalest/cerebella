@@ -1,7 +1,7 @@
 {
   "name": "cerebella",
-  "version": "0.1.10",
-  "description": "this is how coding with AI should feel",
+  "version": "0.1.11",
+  "description": "this is how coding should feel",
   "type": "module",
   "main": "cli.js",
   "bin": {
@@ -11,7 +11,7 @@
     "start": "node cli.js",
     "prepublishOnly": "echo 'Ready to publish!'"
   },
-  "keywords": ["vibe", "coding", "development", "cli", "llm", "agent", "working memory"],
+  "keywords": ["vibe", "coding", "development", "cli", "llm", "agent", "working memory", "active memory"],
   "author": "Max Cembalest <macembalest@gmail.com>",
   "license": "MIT",
   "repository": {

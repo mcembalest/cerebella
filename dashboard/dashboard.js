@@ -29,7 +29,12 @@ function toggleDiff(index) {
     }
 }
 
-function toggleLock(filepath) {
+function toggleLock(filepath, button) {
+    // Immediate visual feedback to prevent race condition
+    const originalIcon = button.textContent;
+    button.disabled = true;
+    button.style.opacity = '0.5';
+    
     fetch('/toggle-lock', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -38,18 +43,31 @@ function toggleLock(filepath) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            update();
+            // Optimistic update - flip the icon immediately
+            button.textContent = originalIcon === '🔒' ? '🔓' : '🔒';
+            // Update button title
+            button.title = (originalIcon === '🔒' ? 'Lock' : 'Unlock') + ' file';
+        } else {
+            console.error('Failed to toggle lock');
         }
     })
-    .catch(err => console.error('Error toggling lock:', err));
+    .catch(err => {
+        console.error('Error toggling lock:', err);
+        // Revert on error
+        button.textContent = originalIcon;
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.style.opacity = '1';
+    });
 }
 
 function lockAll() {
     fetch('/lock-all', {method: 'POST'})
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            update();
+        if (!data.success) {
+            console.error('Failed to lock all files');
         }
     })
     .catch(err => console.error('Error locking all:', err));
@@ -59,8 +77,8 @@ function unlockAll() {
     fetch('/unlock-all', {method: 'POST'})
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            update();
+        if (!data.success) {
+            console.error('Failed to unlock all files');
         }
     })
     .catch(err => console.error('Error unlocking all:', err));
@@ -118,7 +136,7 @@ function update() {
                             <div class="file-summary-item ${lockClass} ${changeClass}">
                                 <span class="file-name">${escapeHtml(info.file)}</span>
                                 <span class="change-count">${info.changeCount} change${info.changeCount !== 1 ? 's' : ''}</span>
-                                <button class="lock-toggle-small" onclick="toggleLock('${info.fullPath.replace(/'/g, "\\'")}')" title="${info.locked ? 'Unlock' : 'Lock'} file">
+                                <button class="lock-toggle-small" data-filepath="${escapeHtml(info.fullPath)}" title="${info.locked ? 'Unlock' : 'Lock'} file">
                                     ${lockIcon}
                                 </button>
                             </div>
@@ -161,6 +179,16 @@ function update() {
             console.error('Error fetching state:', error);
         });
 }
+
+// Event delegation for lock buttons to prevent race conditions
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('lock-toggle-small')) {
+        const filepath = event.target.getAttribute('data-filepath');
+        if (filepath) {
+            toggleLock(filepath, event.target);
+        }
+    }
+});
 
 setInterval(update, 1000);
 update();

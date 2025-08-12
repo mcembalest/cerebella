@@ -1,7 +1,7 @@
 [project]
 name = "cerebella"
-version = "0.1.10"
-description = "this is how coding with AI should feel"
+version = "0.1.11"
+description = "this is how coding should feel"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
