@@ -1,8 +1,0 @@
-[package]
-name = "cerebella"
-version = "0.1.7"
-edition = "2024"
-
-[dependencies]
-candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.9.1" }
-pylate-rs = { version = "1.0.3", features = ["accelerate", "metal"] }
